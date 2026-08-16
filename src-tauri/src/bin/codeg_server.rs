@@ -382,7 +382,8 @@ async fn async_main() -> ExitCode {
     }
 
     // Install bundled expert skills into the central store
-    // (`~/.codeg/skills/`). Runs in the background; failures are logged
+    // (`$CODEG_HOME/skills/`, falling back to `~/.codeg/skills/`). Runs in the
+    // background; failures are logged
     // but non-fatal.
     tokio::spawn(async move {
         let report = codeg_lib::commands::experts::ensure_central_experts_installed().await;

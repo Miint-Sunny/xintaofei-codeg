@@ -4,7 +4,8 @@
 //! almost verbatim. Science skills (curated from
 //! K-Dense-AI/scientific-agent-skills) are bundled into the binary via
 //! `include_dir!` and, on startup, extracted into the same central store as
-//! experts — `~/.codeg/skills/<id>/`. Users enable a science skill for any ACP
+//! experts — `$CODEG_HOME/skills/<id>/` (falling back to
+//! `~/.codeg/skills/<id>/`). Users enable a science skill for any ACP
 //! agent by symlinking (or Windows-junctioning) the agent's skill dir into the
 //! central copy.
 //!
@@ -160,7 +161,8 @@ fn mutation_lock() -> &'static Mutex<()> {
 }
 
 // ─── Paths ──────────────────────────────────────────────────────────────
-// The central store is shared with experts (`~/.codeg/skills/`); only the
+// The central store is shared with experts (`$CODEG_HOME/skills/`, falling
+// back to `~/.codeg/skills/`); only the
 // manifest file differs, so the two sources never clobber each other's state.
 
 fn manifest_path() -> PathBuf {

@@ -2,9 +2,12 @@
 
 ## Status
 
-Proposed for local deployment. The original design and the runtime-pure DSH
-revision were approved in chat on 2026-08-17; implementation starts after
-review of this written record.
+Implemented and verified locally on 2026-08-17. The phase-one deployment
+defers all ordinary DeepSeek MCP configuration, keeps the currently running
+standalone DSH profile on port 3082 untouched, and validates the base DeepSeek
+ACP path inside Codeg. A local 0.26.0 source patch makes Codeg's bundled central
+Skills store honor `CODEG_HOME`; without it, the release binary hard-codes
+`~/.codeg/skills` and violates the project-local deployment boundary.
 
 ## Goals
 
@@ -16,10 +19,10 @@ review of this written record.
   skills.
 - Make Codeg's built-in DeepSeek Harness use the customized
   `/Users/suzuhashimizu/.dsh-coding` home.
-- Keep standalone `dsh-coding` runtime-pure: it continues to load its own Web
-  UI plugins and skills, with no ordinary MCP supplied by this deployment.
-- Give only DeepSeek sessions launched inside Codeg the seven existing local
-  MCP services, then verify discovery and harmless tool calls end to end.
+- Keep standalone DSH runtime-pure: it continues to load its own Web UI plugins
+  and skills, with no ordinary MCP supplied by this deployment.
+- Leave ordinary MCP for DeepSeek sessions inside Codeg unconfigured in phase
+  one. A later phase may add it through Codeg after the base ACP path is proven.
 - Preserve Codeg's per-session `codeg-mcp` platform bridge for both Kimi and
   DeepSeek; this is distinct from their ordinary MCP services.
 - Avoid a private source mirror unless live compatibility testing proves that
@@ -33,6 +36,10 @@ review of this written record.
 - Artifact SHA-256:
   `b96498bf3f646fc751353678dee552f02877ae681e1c5b5c6e6f1ec9eed6164b`,
   matching the GitHub 0.26.0 release asset.
+- The deployed server and MCP companion are locally rebuilt from the 0.26.0
+  source plus the `CODEG_HOME` central-Skills fix. The untouched release
+  binaries remain recoverable under
+  `local/backups/release-binaries.original-0.26.0`.
 - Node.js: 26.6.0, satisfying the Node 22 minimum for Kimi Code and
   `deepseek-acp`.
 - Standalone Kimi Code: 0.36.0. Codeg 0.26.0 manages Kimi Code 0.36.1.
@@ -43,11 +50,13 @@ review of this written record.
   `~/.dsh-coding`, `~/.dsh-minimal`, and `~/.dsh`.
 - Codeg's built-in DeepSeek agent uses `deepseek-acp 0.3.0`, whose DSH
   dependencies are also 0.1.0-rc.6.
-- Kimi's seven MCP entries converge with the `macos-shared-mcp` source, but
-  the supervisor manifest is stale. Only Safari and Fetch
-  `runtimeTreeDigest` values differ; the installed runtimes pass integrity
-  checks. This is manifest publication drift, not a Kimi configuration error.
-- `~/.dsh-coding/mcp.json` does not yet exist.
+- Kimi's seven MCP entries converge with the `macos-shared-mcp` source. The
+  previously stale supervisor manifest was republished atomically for all
+  detected clients after a dry-run showed every client configuration was
+  unchanged.
+- `~/.dsh-coding/mcp.json` remains absent.
+- The currently running standalone DSH instance is `~/.dsh-minimal` on
+  `127.0.0.1:3082`; `~/.dsh-coding` is reserved for Codeg's DeepSeek Harness.
 
 ## Deployment Layout
 
@@ -58,8 +67,11 @@ review of this written record.
 - Small command links:
   `/Users/suzuhashimizu/.local/bin/codeg-server` and
   `/Users/suzuhashimizu/.local/bin/codeg-mcp`.
-- Persistent server data:
-  `/Users/suzuhashimizu/Library/Application Support/codeg-server`.
+- Persistent server data, the access-token file, and Codeg's own bundled skill
+  store:
+  `/Users/suzuhashimizu/code/xintaofei-codeg/local/data`.
+- Codeg-only npm prefix:
+  `/Users/suzuhashimizu/code/xintaofei-codeg/local/npm-global`.
 - LaunchAgent:
   `/Users/suzuhashimizu/Library/LaunchAgents/io.github.xintaofei.codeg-server.local.plist`.
 - Listen address: `127.0.0.1:3090`. This avoids DSH's 3080, 3081, and 3082
@@ -69,12 +81,17 @@ review of this written record.
   - `KIMI_CODE_HOME=/Users/suzuhashimizu/.kimi-code`
   - `CODEG_HOST=127.0.0.1`
   - `CODEG_PORT=3090`
-  - `CODEG_DATA_DIR` and `CODEG_STATIC_DIR` to the paths above
+  - `CODEG_HOME` and `CODEG_DATA_DIR` to the same project-local data path,
+    preventing Codeg's bundled skills from falling back to `~/.codeg`
+  - `CODEG_STATIC_DIR` to the release runtime's `web` directory
+  - `npm_config_prefix` to the Codeg-only npm prefix
 
-The extracted runtime directory is excluded through `.git/info/exclude`, not
-through a tracked project change. Removing the LaunchAgent, two command links,
-the runtime directory, and the Codeg data directory fully removes this local
-deployment.
+The complete `local/` deployment tree, including Codeg's central bundled
+Skills store, is excluded through the tracked
+`.gitignore`, so runtime binaries, logs, databases, backups, npm packages, and
+the access token cannot enter Git. Removing the LaunchAgent, two command links,
+and `local/` fully removes this local deployment; no `~/.codeg` runtime tree is
+required.
 
 ## Agent, MCP, and Skill Ownership
 
@@ -82,31 +99,20 @@ deployment.
 macos-shared-mcp source
         |
         +--> ~/.kimi-code/mcp.json --> native Kimi Code MCP
-        |
-        +--> Codeg's DeepSeek-only canonical MCP store
-                 |
-                 +--> ~/.dsh-coding/mcp.json
-                          |
-                          +--> session/new.mcpServers
-                                   |
-                                   +--> deepseek-acp 0.3.0 inside Codeg
 
-standalone dsh-coding
-        +--> profiles/web/package.json --> DSH Web UI plugins
-        +--> ~/.dsh-coding/skills      --> native DSH skills
-        +--> does not read Codeg's mcp.json store
+standalone dsh-minimal (127.0.0.1:3082)
+        +--> ~/.dsh-minimal            --> existing independent runtime
 
 Codeg sessions
         +--> Kimi Code     --> native Kimi MCP + native Kimi skills
-        +--> DeepSeek ACP  --> ACP-injected MCP + native DSH skills
+        +--> DeepSeek ACP  --> ~/.dsh-coding + no ordinary MCP in phase one
         +--> codeg-mcp     --> per-session Codeg platform tools
 ```
 
-Kimi reads its user-level MCP file natively. `deepseek-acp` does not read a
-native MCP file, so Codeg uses `$DSH_HOME/mcp.json` as its own canonical store
-and forwards those entries over ACP for every new DeepSeek session. Standalone
-DSH does not consume that file, so its runtime remains free of ordinary MCP
-even though the Codeg-owned store is colocated under the shared DSH home.
+Kimi reads its user-level MCP file natively. In phase one no Codeg MCP write
+endpoint is called for DeepSeek, `$DSH_HOME/mcp.json` remains absent, and
+DeepSeek receives an empty ordinary-MCP list. Codeg's bundled `codeg-mcp`
+companion remains a separate platform bridge.
 
 Kimi remains the source of truth for both `~/.kimi-code/mcp.json` and
 `~/.kimi-code/skills`. The deployment may read and verify them, but it does not
@@ -120,26 +126,20 @@ DeepSeek remains the source of truth for its native skill roots, principally
 not copy Kimi skills into DSH or use Codeg's skill manager to alter either
 agent's existing native skill stores.
 
-The initial DeepSeek entries mirror the already-managed Kimi stdio routes.
-They connect to the same supervised local service sockets and preserve the
-existing proxy, runtime integrity, and credential handling. A future change to
-Kimi's MCP routes or runtime mode requires re-importing the affected entry into
-DeepSeek; automatic cross-client synchronization is intentionally out of scope
-for the first deployment.
+Designing and importing DeepSeek ordinary MCP entries is explicitly deferred.
+No phase-one operation creates, imports, mirrors, or synchronizes those entries.
 
 ## DSH Customization Boundary
 
-Pinning `DSH_HOME` to `~/.dsh-coding` shares its credentials, settings, skills,
-session storage, and the location of Codeg's DeepSeek-only MCP store with the
-built-in DeepSeek agent. This is runtime isolation rather than filesystem
-isolation: `~/.dsh-coding/mcp.json` exists, but standalone DSH does not read it.
+Pinning `DSH_HOME` to `~/.dsh-coding` gives Codeg's built-in DeepSeek agent that
+profile's credentials, settings, skills, and session storage. It does not
+create `~/.dsh-coding/mcp.json` in phase one. The active standalone DSH remains
+the separate `~/.dsh-minimal` profile on port 3082.
 
 The packages listed only in `~/.dsh-coding/profiles/web/package.json` are DSH
-Web UI bundles. They continue to work in standalone `dsh-coding`, but they are
-not loaded by `deepseek-acp` inside Codeg. Conversely, ordinary MCP entries in
-`~/.dsh-coding/mcp.json` are forwarded only by Codeg and do not appear in the
-standalone DSH runtime. A future DSH plugin may implement its own MCP behavior;
-that plugin-owned path remains separate from Codeg's ACP injection path.
+Web UI bundles. They are not loaded by `deepseek-acp` inside Codeg. A future
+DSH plugin may implement its own MCP behavior; that plugin-owned path remains
+separate from Codeg's ACP injection path.
 
 Codeg 0.26.0 exposes one built-in DeepSeek Harness identity. Simultaneous
 Codeg identities for coding, minimal, and vanilla homes would require a source
@@ -155,18 +155,19 @@ change and are not part of this deployment.
   file.
 - Preserve Kimi OAuth and managed provider blocks without printing their
   stored values.
-- Keep Codeg data, the DSH MCP store, and generated manifests owner-only where
-  supported.
+- Keep Codeg data, access tokens, npm prefix, and generated manifests
+  owner-only where supported.
 - Never embed GitHub, Bocha, proxy, Kimi, or DeepSeek credentials in MCP URLs,
   arguments, logs, or tracked source.
 
 ## Implementation Sequence
 
-1. Publish the current `macos-shared-mcp` runtime manifest for the Kimi target
-   and verify convergence without changing the contents or ownership of the
-   seven Kimi entries.
+1. Publish the current `macos-shared-mcp` runtime manifest atomically for all
+   detected targets after confirming every rendered client config is unchanged;
+   then verify convergence and preserve the Kimi file digest.
 2. Extract the verified Codeg 0.26.0 runtime into the visible local runtime
-   directory and create stable command links.
+   directory, apply the tested central-Skills path fix, build the server and MCP
+   companion from that source, and create stable command links.
 3. Install and load the loopback-only LaunchAgent with the pinned Kimi and DSH
    homes.
 4. Confirm Codeg reports version 0.26.0 and serves its health/UI endpoint on
@@ -174,50 +175,52 @@ change and are not part of this deployment.
 5. Install or select Codeg's managed Kimi Code 0.36.1 and DeepSeek Harness
    (`deepseek-acp 0.3.0`). Preserve the existing Kimi provider configuration,
    native MCP file, and native skill directories.
-6. Import the seven converged socket specifications into DeepSeek's
-   `$DSH_HOME/mcp.json` through Codeg's canonical MCP path, targeting DeepSeek
-   only. Do not apply this operation to Kimi.
-7. Start standalone `dsh-coding` and prove that the Codeg-owned MCP store is
-   not loaded there while its Web UI plugins and native skills remain present.
-8. Run the remaining acceptance checks below.
+6. Wait for the Codeg DeepSeek ACP snapshot to report selectors ready, then
+   start a session without ordinary MCP and complete a harmless base
+   conversation using `~/.dsh-coding`.
+7. Confirm the existing standalone `~/.dsh-minimal` service remains on port
+   3082 with the same PID and healthy Web UI.
+8. Run the remaining acceptance checks below without invoking any Codeg MCP
+   write endpoint.
 
 ## Acceptance Checks
 
 - Release checksum matches the official 0.26.0 digest.
-- `codeg-server --version` reports 0.26.0 and `codeg-mcp` is its matching
-  sibling.
+- Codeg environment diagnostics report app version 0.26.0, resolve Kimi to the
+  project-local 0.36.1 package, and resolve DeepSeek to the project-local 0.3.0
+  package; `codeg-mcp` is the matching sibling of `codeg-server`.
 - Codeg listens only on `127.0.0.1:3090` and restarts through launchd.
-- `mcp-sync verify --targets kimi` passes with no manifest drift.
-- Kimi Code 0.36.1 starts with the existing `kimi-code/k3-256k` default and
-  sees all seven MCP servers.
+- `mcp-sync verify --targets detected` and the complete `mcp-self-test` pass
+  with no manifest drift.
+- Standalone Kimi 0.36.0 and Codeg's Kimi 0.36.1 both complete a harmless call
+  through Kimi's native Filesystem MCP without Codeg rewriting its MCP file.
 - The before/after digests of Kimi's native MCP file and existing skill entries
   are unchanged by Codeg deployment, apart from the separately authorized
   `macos-shared-mcp` manifest repair outside those files.
 - A neutral-directory Kimi session completes a harmless MCP call.
-- Codeg starts a DeepSeek session using `~/.dsh-coding`, forwards all seven
-  MCP servers, and completes the same class of harmless call.
-- A standalone `dsh-coding` session exposes no ordinary MCP from
-  `~/.dsh-coding/mcp.json`; any future MCP supplied by a DSH plugin is outside
-  this acceptance check.
+- Codeg starts a DeepSeek session using `~/.dsh-coding` with no ordinary MCP
+  configured and completes a harmless base conversation.
+- `~/.dsh-coding/mcp.json` remains absent.
+- The standalone `~/.dsh-minimal` Web UI remains healthy at
+  `127.0.0.1:3082` and is not restarted or reconfigured.
 - Kimi and DeepSeek Codeg sessions receive the bundled `codeg-mcp` companion
   required for enabled platform features without treating it as a user-owned
   MCP entry.
 - No secret value appears in generated config diffs, process arguments, or
   logs inspected during verification.
-- `dsh-coding` Web UI still starts with its existing custom bundles and native
-  skills after the Codeg deployment.
+- Existing Kimi and DSH skill trees are not rewritten by the deployment.
+- The focused Rust regression test proves the central store resolves to
+  `$CODEG_HOME/skills`; after launch, `local/data/skills` contains both bundled
+  manifests and `~/.codeg` remains absent.
 
 ## Failure Handling and Rollback
 
 - Back up every existing file before replacing or merging it; keep the
   backups.
-- If Kimi MCP verification fails, do not continue to DeepSeek import.
-- If Codeg cannot load a mirrored supervised socket, remove only the DeepSeek
-  MCP entry under test and diagnose the protocol boundary before trying a
-  different transport.
-- If standalone DSH unexpectedly begins loading `~/.dsh-coding/mcp.json`, stop
-  and move Codeg to a separate DSH home before continuing; do not silently
-  accept cross-runtime MCP leakage.
+- If Kimi MCP verification fails, stop before Codeg agent validation.
+- If any operation creates `~/.dsh-coding/mcp.json`, stop and remove only that
+  newly created file after preserving diagnostic metadata; phase one does not
+  authorize DeepSeek MCP configuration.
 - If the LaunchAgent fails, unload it and run the same binary once in the
   foreground with the identical non-secret environment to isolate startup
   errors.
@@ -227,11 +230,22 @@ change and are not part of this deployment.
 
 ## Fork Decision
 
-Do not fork Codeg for the runtime-pure single-profile design: 0.26.0 already
-honors process-level `DSH_HOME`, forwards DeepSeek MCP over ACP, and leaves
-standalone DSH outside that forwarding path.
+The phase-one agent integration itself does not need a fork: 0.26.0 already
+honors process-level `DSH_HOME`, provides the Codeg session bridge, and leaves
+the separately running standalone DSH profile outside that path. However, the
+release has one reproducible deployment-boundary defect: its expert/science
+central store bypasses the existing `CODEG_HOME` resolver and hard-codes
+`~/.codeg/skills`.
 
-Create a source patch only if one of these is proven by a reproducible test:
+The minimal fix lives on `codex/kimi-dsh-integration`: route
+`central_experts_dir()` through `paths::codeg_home_dir()` and retain the
+existing `skills` suffix. A failing-before/passing-after unit test covers the
+behavior, and both `codeg-server` and `codeg-mcp` are rebuilt from the same
+source. Keep any private publication as a standalone mirror with the public
+repository retained as read-only `upstream`; do not present it as a GitHub fork
+relationship.
+
+Further source patches require one of these reproducible cases:
 
 - Codeg needs simultaneous named DSH homes.
 - DeepSeek MCP forwarding loses or corrupts a valid Kimi-compatible stdio
@@ -256,8 +270,8 @@ case exists.
 
 Deferred. It would provide automatic synchronization and a dedicated socket
 identity, but it expands the fixed thirteen-client schema, renderer tests,
-runtime manifest, and supervisor matrix. The mirrored, live-tested Codeg store
-is smaller and reversible for the initial deployment.
+runtime manifest, and supervisor matrix. Phase one defers both a formal target
+and a Codeg-owned DeepSeek MCP store until ordinary DeepSeek MCP is requested.
 
 ### Use `~/.dsh` instead of `~/.dsh-coding`
 

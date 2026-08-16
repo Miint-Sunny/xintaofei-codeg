@@ -13,6 +13,9 @@ dist-ssr
 *.local
 tsconfig.tsbuildinfo
 
+# Local Codeg deployment (runtime, state, tokens, and isolated npm prefix).
+/local/
+
 # Next.js
 .next/
 out/
