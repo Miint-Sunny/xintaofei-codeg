@@ -245,6 +245,13 @@ source. Keep any private publication as a standalone mirror with the public
 repository retained as read-only `upstream`; do not present it as a GitHub fork
 relationship.
 
+After final validation, the patch was published to the private standalone
+mirror `Miint-Sunny/xintaofei-codeg` on branch
+`codex/kimi-dsh-integration`. The local `origin` points to that private mirror;
+the public `xintaofei/codeg` repository is retained as `upstream` with its push
+URL disabled. The private mirror's `main` remains the unmodified 0.26.0 release
+commit.
+
 Further source patches require one of these reproducible cases:
 
 - Codeg needs simultaneous named DSH homes.
