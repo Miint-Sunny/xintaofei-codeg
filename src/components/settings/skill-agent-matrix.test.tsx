@@ -39,6 +39,7 @@ function makeStatus(
     expertId,
     agentType,
     state,
+    usable: state === "linked_to_codeg",
     linkPath: "",
     targetPath: null,
     expectedTargetPath: "",

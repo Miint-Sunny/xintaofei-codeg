@@ -170,7 +170,7 @@
     },
     "welcomePanel": {
       "sectionTitle": "Mode selection area",
-      "sectionDescription": "The Code Development / Office Work shortcut cards shown above the composer on the new conversation page.",
+      "sectionDescription": "The compact Code / Work / Research skill launcher shown above the composer on the new conversation page.",
       "showQuickActions": "Show on the new conversation page"
     },
     "workspaceBackground": {
@@ -2814,9 +2814,9 @@
           "scientific-brainstorming": "Scientific Brainstorming",
           "scientific-brainstormingDesc": "Open-ended research ideation — explore interdisciplinary links, challenge assumptions, and surface research gaps.",
           "tabs": {
-            "office": "Office Work",
-            "coding": "Code Development",
-            "research": "Scientific Research"
+            "office": "Work",
+            "coding": "Code",
+            "research": "Research"
           },
           "coding": {
             "brainstormingDesc": "Explore intent & requirements before building",

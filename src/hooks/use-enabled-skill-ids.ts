@@ -107,9 +107,9 @@ function releaseFocusRefresh(): void {
  * Returns the set of skill ids (built-in experts + office tools + science)
  * currently
  * enabled — i.e. symlinked into the given agent's skill directory — for the
- * passed agent. Mirrors the settings page's "enabled" definition: a
- * `(skillId, agentType)` pair counts as enabled only when its install status is
- * `linked_to_codeg`.
+ * passed agent. A `(skillId, agentType)` pair counts as enabled when the
+ * deployed path contains a readable `SKILL.md`, regardless of whether Codeg or
+ * another manager owns that path.
  *
  * `ready` is false until the first snapshot resolves successfully, so callers
  * can avoid marking everything as "not enabled" during the initial async load
@@ -194,10 +194,7 @@ export function useEnabledSkillIds(agentType: AgentType | null): {
     const set = new Set<string>()
     if (!snapshot || !agentType || piSkillsUnmanaged) return set
     for (const status of snapshot) {
-      if (
-        status.agentType === agentType &&
-        status.state === "linked_to_codeg"
-      ) {
+      if (status.agentType === agentType && status.usable) {
         set.add(status.expertId)
       }
     }

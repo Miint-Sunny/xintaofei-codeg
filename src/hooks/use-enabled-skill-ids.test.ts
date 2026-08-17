@@ -37,6 +37,38 @@ async function setup() {
   return { api, hook }
 }
 
+function externallyLinkedStatus(
+  expertId: string,
+  usable: boolean
+): ExpertInstallStatus {
+  return {
+    expertId,
+    agentType: "claude_code",
+    state: "linked_elsewhere",
+    usable,
+    linkPath: "",
+    targetPath: null,
+    expectedTargetPath: "",
+    copyMode: false,
+  } as unknown as ExpertInstallStatus
+}
+
+describe("useEnabledSkillIds — externally managed skills", () => {
+  it("enables a healthy foreign deployment but rejects a broken one", async () => {
+    const { api, hook } = await setup()
+    vi.mocked(api.expertsListAllInstallStatuses).mockResolvedValue([
+      externallyLinkedStatus("healthy-external", true),
+      externallyLinkedStatus("broken-external", false),
+    ])
+
+    const { result } = renderHook(() => hook.useEnabledSkillIds("claude_code"))
+
+    await waitFor(() => expect(result.current.ready).toBe(true))
+    expect(result.current.enabledIds.has("healthy-external")).toBe(true)
+    expect(result.current.enabledIds.has("broken-external")).toBe(false)
+  })
+})
+
 describe("useEnabledSkillIds — focus refresh coalescing", () => {
   it("runs a single (experts + office + science) refresh per focus regardless of how many consumers are mounted", async () => {
     const { api, hook } = await setup()
@@ -105,6 +137,7 @@ function piLinkedStatus(expertId: string): ExpertInstallStatus {
     expertId,
     agentType: "pi",
     state: "linked_to_codeg",
+    usable: true,
     linkPath: "",
     targetPath: null,
     expectedTargetPath: "",

@@ -339,6 +339,7 @@ export function SkillAgentMatrix({
             expertId: op.expertId,
             agentType: op.agentType,
             state: op.enable ? "linked_to_codeg" : "not_linked",
+            usable: op.enable,
             linkPath: existing?.linkPath ?? "",
             targetPath: existing?.targetPath ?? null,
             expectedTargetPath: existing?.expectedTargetPath ?? "",

@@ -46,8 +46,8 @@ use crate::commands::acp::{
 // (same boundary office_tools.rs uses). The central store is shared, so science
 // installs into `central_experts_dir()` too.
 use crate::commands::experts::{
-    central_experts_dir, classify_link, create_link_raw, path_is_symlink, read_link_target,
-    ExpertInstallStatus, ExpertLinkState, LinkOp, LinkOpResult,
+    central_experts_dir, classify_link, create_link_raw, deployed_skill_is_usable, path_is_symlink,
+    read_link_target, ExpertInstallStatus, ExpertLinkState, LinkOp, LinkOpResult,
 };
 use crate::models::agent::AgentType;
 
@@ -247,7 +247,11 @@ fn load_bundled_metadata_inner() -> Result<Vec<ScienceMetadata>, ScienceError> {
             bundled_hash,
         });
     }
-    out.sort_by(|a, b| a.sort_order.cmp(&b.sort_order).then_with(|| a.id.cmp(&b.id)));
+    out.sort_by(|a, b| {
+        a.sort_order
+            .cmp(&b.sort_order)
+            .then_with(|| a.id.cmp(&b.id))
+    });
     Ok(out)
 }
 
@@ -307,7 +311,9 @@ fn hash_disk_directory(path: &Path) -> Result<String, ScienceError> {
     for (rel_path, contents) in files {
         let logical = format!(
             "skills/{}/{}",
-            path.file_name().and_then(|s| s.to_str()).unwrap_or_default(),
+            path.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default(),
             rel_path
         );
         hasher.update(logical.as_bytes());
@@ -599,6 +605,7 @@ pub async fn science_get_install_status(
             expert_id: skill_id.clone(),
             agent_type: agent,
             state,
+            usable: deployed_skill_is_usable(&link_path),
             link_path: link_path.to_string_lossy().to_string(),
             target_path,
             expected_target_path: expected.to_string_lossy().to_string(),
@@ -643,7 +650,8 @@ fn link_one_locked(
     skill_id: &str,
     agent_type: AgentType,
 ) -> Result<ExpertInstallStatus, ScienceError> {
-    let skill_id = validate_skill_id(skill_id).map_err(|e| ScienceError::Metadata(e.to_string()))?;
+    let skill_id =
+        validate_skill_id(skill_id).map_err(|e| ScienceError::Metadata(e.to_string()))?;
     let _ = find_metadata(&skill_id)?;
     let central = science_central_path(&skill_id);
     if !central.exists() {
@@ -697,6 +705,7 @@ fn link_one_locked(
         expert_id: skill_id.clone(),
         agent_type,
         state,
+        usable: deployed_skill_is_usable(&link_path),
         link_path: link_path.to_string_lossy().to_string(),
         target_path,
         expected_target_path: central.to_string_lossy().to_string(),
@@ -725,7 +734,8 @@ pub async fn science_unlink_from_agent(
 /// Remove one science skill's link from one agent's skill dirs. **Assumes the
 /// mutation lock is already held** (see `link_one_locked`).
 fn unlink_one_locked(skill_id: &str, agent_type: AgentType) -> Result<(), ScienceError> {
-    let skill_id = validate_skill_id(skill_id).map_err(|e| ScienceError::Metadata(e.to_string()))?;
+    let skill_id =
+        validate_skill_id(skill_id).map_err(|e| ScienceError::Metadata(e.to_string()))?;
 
     // Scan ALL global dirs for this agent to handle shared-dir agents (Codex,
     // Gemini and Cline all also point at `~/.agents/skills/`).
@@ -819,12 +829,12 @@ pub async fn science_list_all_install_statuses() -> Result<Vec<ExpertInstallStat
                 Err(_) => continue,
             };
             let state = classify_link(&link_path, &expected);
-            let target_path =
-                read_link_target(&link_path).map(|p| p.to_string_lossy().to_string());
+            let target_path = read_link_target(&link_path).map(|p| p.to_string_lossy().to_string());
             out.push(ExpertInstallStatus {
                 expert_id: meta.id.clone(),
                 agent_type: agent,
                 state,
+                usable: deployed_skill_is_usable(&link_path),
                 link_path: link_path.to_string_lossy().to_string(),
                 target_path,
                 expected_target_path: expected.to_string_lossy().to_string(),
@@ -982,7 +992,10 @@ mod tests {
         // (they share the central store). Curation guarantees this; assert it.
         let science_ids: std::collections::HashSet<_> =
             bundled_metadata().iter().map(|m| m.id.as_str()).collect();
-        assert!(!science_ids.is_empty(), "science bundle should be non-empty");
+        assert!(
+            !science_ids.is_empty(),
+            "science bundle should be non-empty"
+        );
         // A representative experts id must not appear among science ids.
         assert!(!science_ids.contains("brainstorming"));
         assert!(!science_ids.contains("writing-plans"));

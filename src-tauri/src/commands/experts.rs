@@ -111,6 +111,7 @@ pub struct ExpertInstallStatus {
     pub expert_id: String,
     pub agent_type: AgentType,
     pub state: ExpertLinkState,
+    pub usable: bool,
     pub link_path: String,
     pub target_path: Option<String>,
     pub expected_target_path: String,
@@ -522,6 +523,12 @@ pub(crate) fn classify_link(link_path: &Path, expected_target: &Path) -> ExpertL
     }
 }
 
+/// Whether an agent can load the deployed skill at `path`, independent of
+/// which application owns the link or directory.
+pub(crate) fn deployed_skill_is_usable(path: &Path) -> bool {
+    fs::File::open(path.join("SKILL.md")).is_ok()
+}
+
 // ─── Central store installation ────────────────────────────────────────
 
 pub async fn ensure_central_experts_installed() -> InstallReport {
@@ -761,6 +768,7 @@ pub async fn experts_get_install_status(
             expert_id: expert_id.clone(),
             agent_type: agent,
             state,
+            usable: deployed_skill_is_usable(&link_path),
             link_path: link_path.to_string_lossy().to_string(),
             target_path,
             expected_target_path: expected.to_string_lossy().to_string(),
@@ -862,6 +870,7 @@ fn link_one_locked(
         expert_id: expert_id.clone(),
         agent_type,
         state,
+        usable: deployed_skill_is_usable(&link_path),
         link_path: link_path.to_string_lossy().to_string(),
         target_path,
         expected_target_path: central.to_string_lossy().to_string(),
@@ -993,12 +1002,12 @@ pub async fn experts_list_all_install_statuses() -> Result<Vec<ExpertInstallStat
                 Err(_) => continue,
             };
             let state = classify_link(&link_path, &expected);
-            let target_path =
-                read_link_target(&link_path).map(|p| p.to_string_lossy().to_string());
+            let target_path = read_link_target(&link_path).map(|p| p.to_string_lossy().to_string());
             out.push(ExpertInstallStatus {
                 expert_id: meta.id.clone(),
                 agent_type: agent,
                 state,
+                usable: deployed_skill_is_usable(&link_path),
                 link_path: link_path.to_string_lossy().to_string(),
                 target_path,
                 expected_target_path: expected.to_string_lossy().to_string(),
@@ -1043,6 +1052,38 @@ pub async fn experts_open_central_dir() -> Result<String, ExpertsError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deployed_skill_is_usable_requires_a_readable_skill_md() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let valid = temp.path().join("valid");
+        let invalid = temp.path().join("invalid");
+        fs::create_dir_all(&valid).expect("valid dir");
+        fs::create_dir_all(&invalid).expect("invalid dir");
+        fs::write(valid.join("SKILL.md"), "# Valid\n").expect("skill file");
+
+        assert!(deployed_skill_is_usable(&valid));
+        assert!(!deployed_skill_is_usable(&invalid));
+        assert!(!deployed_skill_is_usable(&temp.path().join("missing")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn deployed_skill_is_usable_follows_foreign_and_rejects_broken_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let target = temp.path().join("manager-skill");
+        let deployed = temp.path().join("deployed");
+        let broken = temp.path().join("broken");
+        fs::create_dir_all(&target).expect("target dir");
+        fs::write(target.join("SKILL.md"), "# Managed externally\n").expect("skill file");
+        symlink(&target, &deployed).expect("foreign link");
+        symlink(temp.path().join("gone"), &broken).expect("broken link");
+
+        assert!(deployed_skill_is_usable(&deployed));
+        assert!(!deployed_skill_is_usable(&broken));
+    }
 
     #[test]
     fn central_store_honors_codeg_home() {

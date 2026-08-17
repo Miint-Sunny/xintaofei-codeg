@@ -102,25 +102,9 @@ const TIPS: TipDef[] = [
   { key: "workspaceBackground" },
 ]
 
-const highlightTitle = (chunks: ReactNode) => (
-  <span className="bg-gradient-to-br from-primary via-primary/85 to-chart-3 bg-clip-text text-transparent">
-    {chunks}
-  </span>
-)
-
 const highlightTip = (chunks: ReactNode) => (
   <span className="font-medium text-primary">{chunks}</span>
 )
-
-export function WelcomeHero() {
-  const t = useTranslations("Folder.chat.welcomePanel")
-
-  return (
-    <h1 className="text-center text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-      {t.rich("greeting", { highlight: highlightTitle })}
-    </h1>
-  )
-}
 
 export function WelcomeTip() {
   const t = useTranslations("Folder.chat.welcomePanel")
