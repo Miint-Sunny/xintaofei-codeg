@@ -2700,6 +2700,7 @@ export interface ExpertInstallStatus {
   expertId: string
   agentType: AgentType
   state: ExpertLinkState
+  usable: boolean
   linkPath: string
   targetPath: string | null
   expectedTargetPath: string

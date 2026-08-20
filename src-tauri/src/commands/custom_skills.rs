@@ -38,8 +38,8 @@ use crate::commands::acp::{
 // Reuse the generic filesystem link primitives, link-state DTOs and the shared
 // central store from experts (the same boundary science/office use).
 use crate::commands::experts::{
-    central_experts_dir, classify_link, create_link_raw, path_is_symlink, read_link_target,
-    ExpertInstallStatus, ExpertLinkState, LinkOp, LinkOpResult,
+    central_experts_dir, classify_link, create_link_raw, deployed_skill_is_usable, path_is_symlink,
+    read_link_target, ExpertInstallStatus, ExpertLinkState, LinkOp, LinkOpResult,
 };
 use crate::models::agent::AgentType;
 
@@ -216,11 +216,7 @@ fn read_frontmatter_name(skill_md: &Path) -> Option<String> {
         // Only a top-level `name:` (no leading whitespace) counts.
         if !line.starts_with(|c: char| c.is_whitespace()) {
             if let Some(rest) = line.strip_prefix("name:") {
-                let val = rest
-                    .trim()
-                    .trim_matches('"')
-                    .trim_matches('\'')
-                    .trim();
+                let val = rest.trim().trim_matches('"').trim_matches('\'').trim();
                 if !val.is_empty() {
                     return Some(val.to_string());
                 }
@@ -299,8 +295,8 @@ pub async fn custom_list() -> Result<Vec<CustomSkillItem>, CustomSkillsError> {
 /// One-shot snapshot of every (custom skill, agent) link state — lets the matrix
 /// render the whole grid from a single round-trip.
 #[cfg_attr(feature = "tauri-runtime", tauri::command)]
-pub async fn custom_list_all_install_statuses() -> Result<Vec<ExpertInstallStatus>, CustomSkillsError>
-{
+pub async fn custom_list_all_install_statuses(
+) -> Result<Vec<ExpertInstallStatus>, CustomSkillsError> {
     let ids = collect_custom_ids()?;
     let agents = supported_agents();
     let mut out = Vec::with_capacity(ids.len() * agents.len());
@@ -312,12 +308,12 @@ pub async fn custom_list_all_install_statuses() -> Result<Vec<ExpertInstallStatu
                 Err(_) => continue,
             };
             let state = classify_link(&link_path, &expected);
-            let target_path =
-                read_link_target(&link_path).map(|p| p.to_string_lossy().to_string());
+            let target_path = read_link_target(&link_path).map(|p| p.to_string_lossy().to_string());
             out.push(ExpertInstallStatus {
                 expert_id: id.clone(),
                 agent_type: agent,
                 state,
+                usable: deployed_skill_is_usable(&link_path),
                 link_path: link_path.to_string_lossy().to_string(),
                 target_path,
                 expected_target_path: expected.to_string_lossy().to_string(),
@@ -392,6 +388,7 @@ fn link_one_locked(
         expert_id: id.clone(),
         agent_type,
         state,
+        usable: deployed_skill_is_usable(&link_path),
         link_path: link_path.to_string_lossy().to_string(),
         target_path,
         expected_target_path: central.to_string_lossy().to_string(),
@@ -597,8 +594,8 @@ pub async fn custom_import_from_agent(
     ids: Vec<String>,
 ) -> Result<Vec<CustomImportResult>, CustomSkillsError> {
     let _guard = mutation_lock().lock().await;
-    let spec = skill_storage_spec(agent_type)
-        .ok_or(CustomSkillsError::UnsupportedAgent(agent_type))?;
+    let spec =
+        skill_storage_spec(agent_type).ok_or(CustomSkillsError::UnsupportedAgent(agent_type))?;
     Ok(ids
         .iter()
         .map(|id| import_one_from_agent_locked(&spec, id))
@@ -612,9 +609,12 @@ fn import_one_from_agent_locked(spec: &SkillStorageSpec, raw_id: &str) -> Custom
     // Resolve the source on disk (a `<id>/` skill dir or a `<id>.md` file) from
     // the agent's GLOBAL skill dirs. Project-scoped skills are workspace-specific
     // and deliberately excluded from the shared store.
-    let Some(item) =
-        locate_existing_skill_across_dirs(&spec.global_dirs, spec.kind, raw_id, AgentSkillScope::Global)
-    else {
+    let Some(item) = locate_existing_skill_across_dirs(
+        &spec.global_dirs,
+        spec.kind,
+        raw_id,
+        AgentSkillScope::Global,
+    ) else {
         return CustomImportResult {
             id: raw_id.to_string(),
             name: raw_id.to_string(),
@@ -951,7 +951,10 @@ mod tests {
         let results = custom_apply_links(ops).await.expect("batch returns Ok");
         assert_eq!(results.len(), 2);
         assert!(results[0].ok, "idempotent disable should succeed");
-        assert!(!results[1].ok, "enable of missing central skill should fail");
+        assert!(
+            !results[1].ok,
+            "enable of missing central skill should fail"
+        );
         assert!(results[1].error.is_some());
         assert!(results[1].status.is_none());
     }
@@ -973,10 +976,7 @@ mod tests {
     #[tokio::test]
     async fn create_and_save_reject_reserved_ids() {
         let created = custom_create_skill("writing-plans".into(), "x".into()).await;
-        assert!(matches!(
-            created,
-            Err(CustomSkillsError::ReservedId(_))
-        ));
+        assert!(matches!(created, Err(CustomSkillsError::ReservedId(_))));
         let saved = custom_save_skill("writing-plans".into(), "x".into()).await;
         assert!(matches!(saved, Err(CustomSkillsError::ReservedId(_))));
     }
@@ -996,7 +996,9 @@ mod tests {
         .expect("batch returns Ok");
         assert_eq!(results.len(), 2);
         assert!(
-            results.iter().all(|r| !r.ok && !r.skipped && r.error.is_some()),
+            results
+                .iter()
+                .all(|r| !r.ok && !r.skipped && r.error.is_some()),
             "{results:?}"
         );
     }
@@ -1014,7 +1016,9 @@ mod tests {
     #[test]
     fn validate_skill_id_rejects_traversal_and_separators() {
         // The load-bearing sanitizer every authoring path funnels through.
-        for bad in ["", "  ", "..", "../x", "a/b", "a\\b", ".hidden", "a:b", "a b"] {
+        for bad in [
+            "", "  ", "..", "../x", "a/b", "a\\b", ".hidden", "a:b", "a b",
+        ] {
             assert!(validate_skill_id(bad).is_err(), "must reject {bad:?}");
         }
         for good in ["my-skill", "a.b_c-1", "Skill123"] {
@@ -1097,7 +1101,10 @@ mod tests {
             assert!(res[0].ok, "link enable should succeed: {res:?}");
 
             let link = agent_link_path(AgentType::ClaudeCode, id).expect("link path");
-            assert!(path_is_symlink(&link), "agent link should exist after enable");
+            assert!(
+                path_is_symlink(&link),
+                "agent link should exist after enable"
+            );
 
             let dir = central_experts_dir().join(id);
             let del = custom_delete_skills(vec![id.into()])
@@ -1193,12 +1200,12 @@ mod tests {
             )
             .await
             .expect("batch returns Ok");
-            assert!(
-                del.iter().all(|r| !r.ok && r.error.is_some()),
-                "{del:?}"
-            );
+            assert!(del.iter().all(|r| !r.ok && r.error.is_some()), "{del:?}");
 
-            assert!(sentinel.is_file(), "sentinel outside the store must survive");
+            assert!(
+                sentinel.is_file(),
+                "sentinel outside the store must survive"
+            );
             assert_eq!(fs::read_to_string(&sentinel).unwrap(), "keep me");
         })
         .await;

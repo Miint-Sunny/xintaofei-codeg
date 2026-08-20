@@ -170,7 +170,7 @@
     },
     "welcomePanel": {
       "sectionTitle": "模式选择区域",
-      "sectionDescription": "新会话页面输入框上方显示的「代码开发 / 日常办公」快捷卡片区域。",
+      "sectionDescription": "新会话页面输入框上方显示的紧凑「代码 / 日常 / 研究」技能入口。",
       "showQuickActions": "在新会话页面显示"
     },
     "workspaceBackground": {
@@ -1740,6 +1740,7 @@
     "conversationCard": {
       "untitledConversation": "未命名会话",
       "newConversation": "新建会话",
+      "attachToCurrentSession": "添加到会话",
       "rename": "重命名",
       "status": "状态",
       "delete": "删除",
@@ -1822,6 +1823,16 @@
         "cacheRead": "缓存读取",
         "cacheWrite": "缓存写入",
         "total": "总计"
+      },
+      "quickActions": {
+        "title": "快捷操作",
+        "groups": {
+          "workspace": "工作区",
+          "sessions": "会话",
+          "automation": "自动化与待办",
+          "more": "更多"
+        },
+        "showPet": "显示宠物"
       }
     },
     "auxPanel": {
@@ -2686,6 +2697,7 @@
         "slashCommands": "斜杠命令",
         "slashSearchPlaceholder": "搜索命令...",
         "slashSearchEmpty": "没有匹配的命令",
+        "slashLoading": "正在加载命令…",
         "experts": "专家",
         "office": "日常办公",
         "research": "科学研究",
@@ -2814,9 +2826,9 @@
           "scientific-brainstorming": "科学头脑风暴",
           "scientific-brainstormingDesc": "开放式科研构思：探索跨学科联系、挑战假设、发现研究空白。",
           "tabs": {
-            "office": "日常办公",
-            "coding": "代码开发",
-            "research": "科学研究"
+            "office": "日常",
+            "coding": "代码",
+            "research": "研究"
           },
           "coding": {
             "brainstormingDesc": "动手前先梳理意图与需求",

@@ -170,7 +170,7 @@
     },
     "welcomePanel": {
       "sectionTitle": "Mode selection area",
-      "sectionDescription": "The Code Development / Office Work shortcut cards shown above the composer on the new conversation page.",
+      "sectionDescription": "The compact Code / Work / Research skill launcher shown above the composer on the new conversation page.",
       "showQuickActions": "Show on the new conversation page"
     },
     "workspaceBackground": {
@@ -1740,6 +1740,7 @@
     "conversationCard": {
       "untitledConversation": "Untitled conversation",
       "newConversation": "New Conversation",
+      "attachToCurrentSession": "Add to session",
       "rename": "Rename",
       "status": "Status",
       "delete": "Delete",
@@ -1822,6 +1823,16 @@
         "cacheRead": "Cache Read",
         "cacheWrite": "Cache Write",
         "total": "Total"
+      },
+      "quickActions": {
+        "title": "Quick actions",
+        "groups": {
+          "workspace": "Workspace",
+          "sessions": "Sessions",
+          "automation": "Automation & to-dos",
+          "more": "More"
+        },
+        "showPet": "Show pet"
       }
     },
     "auxPanel": {
@@ -2686,6 +2697,7 @@
         "slashCommands": "Slash commands",
         "slashSearchPlaceholder": "Search commands...",
         "slashSearchEmpty": "No matching commands",
+        "slashLoading": "Loading commands…",
         "experts": "Experts",
         "office": "Office Work",
         "research": "Scientific Research",
@@ -2814,9 +2826,9 @@
           "scientific-brainstorming": "Scientific Brainstorming",
           "scientific-brainstormingDesc": "Open-ended research ideation — explore interdisciplinary links, challenge assumptions, and surface research gaps.",
           "tabs": {
-            "office": "Office Work",
-            "coding": "Code Development",
-            "research": "Scientific Research"
+            "office": "Work",
+            "coding": "Code",
+            "research": "Research"
           },
           "coding": {
             "brainstormingDesc": "Explore intent & requirements before building",

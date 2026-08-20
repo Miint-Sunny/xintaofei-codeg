@@ -362,7 +362,8 @@ mod tauri_app {
                 });
 
                 // Install bundled expert skills into the central store
-                // (`~/.codeg/skills/`). Runs in the background and does
+                // (`$CODEG_HOME/skills/`, falling back to `~/.codeg/skills/`).
+                // Runs in the background and does
                 // not block startup; failures are logged but non-fatal.
                 tauri::async_runtime::spawn(async move {
                     let report = crate::commands::experts::ensure_central_experts_installed().await;
@@ -383,7 +384,8 @@ mod tauri_app {
                 });
 
                 // Install bundled scientific-research skills into the same
-                // central store (`~/.codeg/skills/`). Background, non-blocking;
+                // central store (`$CODEG_HOME/skills/`, falling back to
+                // `~/.codeg/skills/`). Background, non-blocking;
                 // failures are logged but non-fatal.
                 tauri::async_runtime::spawn(async move {
                     let report = crate::commands::science::ensure_central_science_installed().await;

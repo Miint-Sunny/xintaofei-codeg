@@ -57,7 +57,7 @@ import { useFeedbackEnabled } from "@/hooks/use-feedback-enabled"
 import { useSessionFeedback } from "@/hooks/use-session-feedback"
 import { AgentSelector } from "@/components/chat/agent-selector"
 import { ChatInput } from "@/components/chat/chat-input"
-import { WelcomeHero, WelcomeTip } from "@/components/chat/welcome-hero"
+import { WelcomeTip } from "@/components/chat/welcome-hero"
 import { QuickActions } from "@/components/chat/quick-actions"
 import type { ComposerInjectContent } from "@/components/chat/message-input"
 import { TileScrollContainer } from "@/components/conversations/tile-scroll-container"
@@ -861,7 +861,17 @@ const ConversationTabView = memo(function ConversationTabView({
 
   useEffect(() => {
     if (effectiveConversationId <= 0) return
-    setExternalId(effectiveConversationId, detail?.summary.external_id ?? null)
+    // Only ever WRITE a real id — never clear one. `detail` is null while a
+    // (re)fetch is in flight, and writing null then would wipe a session id the
+    // connSessionId effect below had already resolved. That store value is one
+    // of the two sources `externalId` (and therefore the sessionId passed to
+    // acp_connect) resolves from, so clearing it can turn a reconnect into
+    // session/new and strand the conversation's history. Nothing ever nulls a
+    // row's external_id, and switching conversations changes the store key
+    // rather than clearing this one, so there is no case that needs the clear.
+    const persisted = detail?.summary.external_id
+    if (!persisted) return
+    setExternalId(effectiveConversationId, persisted)
   }, [effectiveConversationId, detail?.summary.external_id, setExternalId])
 
   useEffect(() => {
@@ -1873,7 +1883,6 @@ const ConversationTabView = memo(function ConversationTabView({
           <div className="flex min-h-full flex-col">
             <div className="flex-1" />
             <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-col gap-6 px-4 py-4">
-              <WelcomeHero />
               <QuickActions
                 onSelect={handleQuickAction}
                 agentType={selectedAgent}

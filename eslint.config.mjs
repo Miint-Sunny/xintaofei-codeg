@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "src-tauri/target/**",
     "src-tauri/experts/**",
     "public/vs/**",
+    // Project-local runtime data, installed dependencies, logs, and backups.
+    // These files are intentionally outside the source tree and gitignored.
+    "local/**",
     // Gitignored scratch space for planning/review docs and one-off probe
     // scripts. Prettier already skips it — its `--ignore-path` defaults to
     // `.gitignore` — but flat config has no such default, so without this
