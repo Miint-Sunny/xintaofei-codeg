@@ -1,0 +1,68 @@
+name: Build macOS arm64 DMG
+
+on:
+  push:
+    branches:
+      - ci/macos-arm64-dmg-0.26.2
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  HUSKY: 0
+
+concurrency:
+  group: macos-arm64-dmg-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS arm64 DMG
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      TAURI_TARGET_TRIPLE: aarch64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stage codeg-mcp sidecar
+        run: pnpm tauri:prepare-sidecars --target aarch64-apple-darwin
+
+      - name: Build ad-hoc signed DMG
+        env:
+          CODEG_SKIP_SIDECAR: "1"
+        run: >-
+          pnpm tauri build
+          --target aarch64-apple-darwin
+          --bundles dmg
+          --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"-"}}}'
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeg-0.26.2-macos-arm64-dmg
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
